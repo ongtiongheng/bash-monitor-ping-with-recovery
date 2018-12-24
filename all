@@ -1,0 +1,166 @@
+# Odd for alert- Clearcall monitors
+*/5 * * * * (cd /tmp/ongth && /bin/bash /home/ongth/monitor-clearcall.sh 202.79.220.93 >/dev/null 2>&1) 
+*/5 * * * * (cd /tmp/ongth && /bin/bash /home/ongth/monitor-clearcall.sh 202.79.220.90 >/dev/null 2>&1) 
+*/5 * * * * (cd /tmp/ongth && /bin/bash /home/ongth/monitor-clearcall.sh 116.51.17.242 >/dev/null 2>&1) 
+*/5 * * * * (cd /tmp/ongth && /bin/bash /home/ongth/monitor-clearcall.sh 116.51.30.75 >/dev/null 2>&1) 
+
+
+# Even minute for recovery
+*/2 * * * * (cd /tmp/ongth && /bin/bash /home/ongth/checking-recoveryclearcall.sh >/dev/null 2>&1)
+
+
+/home/ongth/monitor-clearcall.sh
+#!/bin/bash
+session_id=`head -c4 /dev/urandom | od -N4 -tu4 | sed -ne '1s/.* //p'`
+ping -c3 -i11 $1 > /tmp/$session_id
+if [ $? -eq 0 ]
+then echo "pass" 
+else /home/ongth/sendmail-clearcall.sh $1 /tmp/$session_id ; touch "/tmp/f_$1"
+fi
+rm /tmp/$session_id
+root@raspberrypi:/tmp# cat /home/ongth/monitor-clearcall.sh
+#!/bin/bash
+session_id=`head -c4 /dev/urandom | od -N4 -tu4 | sed -ne '1s/.* //p'`
+ping -c3 -i11 $1 > /tmp/$session_id
+if [ $? -eq 0 ]
+then echo "pass" 
+else /home/ongth/sendmail-clearcall.sh $1 /tmp/$session_id ; touch "/tmp/f_$1"
+fi
+rm /tmp/$session_id
+
+/home/ongth/sendmail-clearcall.sh
+#!/bin/bash 
+#
+# warning - private stuff here do not copy and paste
+#
+# arg1 = router ip address/hostname
+#
+arg1=$1
+arg2=$2
+DATE=`date +%T`
+serverlist[0]="smtp01.ntt.com.sg"
+serverlist[1]="smtp.ntt.sg"
+rand=$[$RANDOM % 2]
+     ( 
+        sleep 1 
+        echo helo a 
+        sleep 1 
+        echo mail from:\<\> 
+        sleep 1 
+        echo rcpt to:helpdesk@ntt.com.sg
+        #echo rcpt to:patrick.ong@ntt.com.sg
+        sleep 1 
+        echo rcpt to:networkadmin@ntt.com.sg
+        sleep 1 
+        echo data 
+        echo "From: no-reply@ntt.com.sg"
+        echo "To: Helpdesk@ntt.com.sg"
+	echo "MIME-Version: 1.0" 
+	echo "Subject: [Critical] $DATE Alert ~ 1517 Clearcall monitor cannot reach $1" 
+	echo "From: $from"
+	echo "To: patrick.ong@ntt.com.sg"
+	echo "Content-Type: multipart/mixed; boundary=sep"
+        echo "X-Priority: 1 (Highest)"
+        echo "X-MSMail-Priority: High"
+	echo "--sep"
+	echo "Content-Type: text/plain; charset=UTF-8"
+        echo ####
+        echo ""
+	echo "Table of Content"
+	echo "1) Cisco 2960 202.79.220.93 (NWA)"
+	echo "2) Netscreen  202.79.220.90 (NWA)"
+	echo "3) Cisco 3825 116.51.17.242 (NWA)"
+	echo "4) IVR1, eth1 116.51.30.75 (System admin)"
+        echo ""
+        echo ""
+	echo "Helpdesk action item: Call the above team for break-fix"
+        echo ""
+        echo "--- AI baseline diagnostic ---"
+        echo ""
+        cat "$arg2"
+        echo ""
+        echo . 
+        sleep 5 
+        echo quit
+   ) | telnet ${serverlist[$rand]} 25
+
+/home/ongth/checking-recoveryclearcall.sh
+#!/bin/bash
+#
+arg1=$1
+DATE=`date +%Y-%m-%d`
+session_id=`head -c4 /dev/urandom | od -N4 -tu4 | sed -ne '1s/.* //p'`
+#_file=$arg1.check
+arg_jump1[0]="blanc.sg.ntt.net"
+arg_jump1[1]="charmonix.sg.ntt.net"
+arg_jump2[0]="gulfstream.sg.ntt.net"
+arg_jump2[1]="eyehawk.sg.ntt.net"
+rand_j1=$[$RANDOM % 2]
+rand_j2=$[$RANDOM % 2]
+rand_preempt1=$[$RANDOM % 2 + 1]
+rand_preempt2=`/usr/bin/od -vAn -N2 -tu2 < /dev/urandom`
+
+# Random Sleep to async the attempts
+/bin/sleep 0.$(($rand_preempt2-$rand_preempt1))
+
+#[ ! -f "$_file" ] && { echo "Error: $0 file not found."; exit 2; }
+
+dir=`ls -alh /tmp/f_* | awk -F "/tmp/f_" '{print $2}'`
+for p in $dir
+do
+    echo "${p}"
+
+    ping -c3 -i11 "${p}" > /tmp/$session_id
+    if [ $? -eq 0 ]
+    then 
+        /home/ongth/sendmail-sendrecovery-clearcall.sh "${p}"
+        rm -f "/tmp/f_${p}"
+    else "cont. failed"
+    fi
+
+done
+
+/home/ongth/sendmail-sendrecovery-clearcall.sh
+#!/bin/bash 
+#
+# warning - private stuff here do not copy and paste
+#
+# arg1 = router ip address/hostname
+#
+arg1=$1
+DATE=`date +%T`
+serverlist[0]="smtp01.ntt.com.sg"
+serverlist[1]="smtp.ntt.sg"
+rand=$[$RANDOM % 2]
+
+   (
+	sleep 1 
+	echo helo a 
+	sleep 1 
+        echo mail from:\<\> 
+        sleep 1 
+        echo rcpt to:helpdesk@ntt.com.sg
+        sleep 1 
+        echo rcpt to:networkadmin@ntt.com.sg
+        sleep 1 
+        echo data 
+        echo "From: no-reply@ntt.com.sg"
+        echo "To: Helpdesk@ntt.com.sg"
+	echo "MIME-Version: 1.0" 
+	echo "Subject: [NORMAL] $DATE Clear ~ 1517 Clearcall monitor to $arg1 has no more lost" 
+	echo "From: $from"
+	echo "To: patrick.ong@ntt.com.sg"
+	echo "Content-Type: multipart/mixed; boundary=sep"
+        echo "X-Priority: 1 (Highest)"
+        echo "X-MSMail-Priority: High"
+	echo "--sep"
+	echo "Content-Type: text/plain; charset=UTF-8"
+        echo ####
+	echo "Service has been restored, $DATE"
+	echo ""
+        echo . 
+        sleep 5 
+        echo quit
+   ) | telnet ${serverlist[$rand]} 25
+
+
